@@ -13,7 +13,7 @@
     # HANDOFF "Repo logistics"). Public so downstream consumers can eval.
     mcp-injector.url = "github:noblepayne/mcp-injector";
 
-    datom.url = "github:noblepayne/datom/feat/mvp";
+    datom.url = "github:noblepayne/datom";
 
     workshop = {
       url = "github:noblepayne/workshop";
