@@ -63,9 +63,9 @@ docs/hermes-wiring.md  # host-side wiring expertise (write last)
 ## Repo logistics
 
 - **Input-passing convention (locked at skeleton):** every module takes `coreInputs` (all flake inputs + `self`) at import time and returns a NixOS module: `import ./modules/x.nix coreInputs`. `mkAgentHost` must thread the same inputs via `specialArgs` inside its `nixosSystem` wrapper. Do not write modules as plain `{config, lib, pkgs, ...}:` functions that need flake inputs.
-- **Forge is primary; GitHub mirrors consumers.** `mcp-injector` (github:noblepayne/mcp-injector) and `datom` (github:noblepayne/datom, branch feat/mvp mirrored to main) live on forge first, then mirror to public GitHub so downstreams can eval without forge SSH. Mirror flow: push forge → push same refs to GitHub. datom history was rewritten 2026-08-23 to drop a 108MB `.lsp/` cache blob — old rev e362ed4 is orphaned; the reference host's lock needs a `datom` update at migration.
+- **Forge is primary; GitHub mirrors consumers.** `mcp-injector` (github:noblepayne/mcp-injector) and `datom` (github:noblepayne/datom, single-branch main) live on forge first, then mirror to public GitHub so downstreams can eval without forge SSH. Mirror flow: push forge → push same refs to GitHub. datom history was re-rooted 2026-08-23 onto an orphan `init` after a 108MB `.lsp/` cache blob purge; all pre-rewrite revs are orphaned; the reference host's lock needs a `datom` update at migration.
 - **nixpkgs skew is accepted:** no `follows` anywhere means the lock holds ~8 distinct transitive nixpkgs revs. That's the cost of hard rule 4 — don't "fix" it by adding follows.
-- **Branch-pinned inputs:** datom `feat/mvp`, clojure-mcp `feat/flake`. Reproducible until `nix flake update`; bump deliberately.
+- **Branch ontology (2026-08-23):** every repo is single-branch `main` with a clean orphan root — no mirror/feature branch pairs. Forge and GitHub mains are identical; forge is where dev lands first. clojure-mcp remains branch-pinned `feat/flake` upstream.
 - Remote once Wes creates it on the forge:
   `git remote add origin git@github.com:noblepayne/agent-core.git  # plus forge when created`
 - Don't push until Wes confirms the forge repo exists.
