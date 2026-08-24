@@ -20,12 +20,89 @@
 
   # Host chains merge OVER defaults (recursiveUpdate: right side wins).
   resolvedChains = lib.recursiveUpdate chainDefaults cfg.injector.chains;
+
+  # Rendered bifrost seed config: providers with env.* key refs (secrets
+  # resolve from the container's credentialsFile at runtime, never in-store).
+  bifrostConfig = (pkgs.formats.json {}).generate "bifrost-config.json" {
+    "$schema" = "https://www.getbifrost.ai/schema";
+    providers =
+      lib.mapAttrs
+      (_: p:
+        {
+          keys = map (k: {inherit (k) name value models weight;}) p.keys;
+        }
+        // p.extraConfig)
+      cfg.bifrost.providers;
+    config_store = {
+      enabled = true;
+      type = "sqlite";
+      config.path = "./config.db";
+    };
+  };
   inherit (lib) mkEnableOption mkIf mkOption types;
 in {
   imports = [mcp-injector.nixosModules.default];
 
   options.agent-core = {
-    bifrost.enable = mkEnableOption "bifrost LLM gateway container" // {default = true;};
+    bifrost = {
+      enable = mkEnableOption "bifrost LLM gateway container" // {default = true;};
+
+      providers = mkOption {
+        type = types.attrsOf (types.submodule {
+          options = {
+            keys = mkOption {
+              type = types.listOf (types.submodule {
+                options = {
+                  name = mkOption {
+                    type = types.str;
+                    description = "Key label inside bifrost.";
+                  };
+                  value = mkOption {
+                    type = types.str;
+                    description = ''
+                      Key value. Use "env.VARNAME" to resolve the secret from
+                      the container environment (credentialsFile) \u2014 keeps
+                      secrets out of the rendered config.json and the store.
+                    '';
+                  };
+                  models = mkOption {
+                    type = types.listOf types.str;
+                    default = [];
+                    description = "Restrict key to these models; empty = all.";
+                  };
+                  weight = mkOption {
+                    type = types.float;
+                    default = 1.0;
+                  };
+                };
+              });
+              default = [];
+            };
+            extraConfig = mkOption {
+              type = types.attrs;
+              default = {};
+              description = "Provider-level passthru merged into its config block.";
+            };
+          };
+        });
+        default = {};
+        description = ''
+          Upstream providers seeded into /var/lib/bifrost/config.json at
+          activation (DB-backed bootstrap mode: Nix seeds, dashboard stays
+          usable, hash reconciliation avoids stomping manual edits).
+        '';
+      };
+
+      credentialsFile = mkOption {
+        type = types.nullOr types.str;
+        default = "/var/lib/bifrost/credentials.env";
+        description = ''
+          Env file passed to the container; holds the VARNAME values that
+          config.json env.* references resolve against. Created (empty) by
+          tmpfiles if absent.
+        '';
+      };
+    };
 
     injector = {
       enable = mkEnableOption "mcp-injector shim service" // {default = true;};
@@ -102,6 +179,18 @@ in {
     }
 
     (mkIf cfg.bifrost.enable {
+      # Declarative provider seeding: rendered config.json (env.* key refs,
+      # no secrets in-store) is bind-mounted into the container and
+      # bootstraps bifrost's config store at startup.
+      systemd.tmpfiles.rules = [
+        "d /var/lib/bifrost 0777 root root -"
+        "f ${cfg.bifrost.credentialsFile} 0600 root root -"
+      ];
+
+      systemd.services.podman-bifrost = {
+        restartTriggers = [bifrostConfig];
+      };
+
       virtualisation.podman = {
         enable = true;
         dockerCompat = true;
@@ -117,7 +206,13 @@ in {
         containers.bifrost = {
           image = "maximhq/bifrost:latest";
           autoStart = true;
-          volumes = ["/var/lib/bifrost:/app/data:U"];
+          volumes = [
+            "/var/lib/bifrost:/app/data:U"
+            "${bifrostConfig}:/app/data/config.json"
+          ];
+          environmentFiles =
+            lib.optional (cfg.bifrost.credentialsFile != null)
+            cfg.bifrost.credentialsFile;
           environment = {
             APP_PORT = "8080";
             APP_HOST = "0.0.0.0";
@@ -133,10 +228,8 @@ in {
         };
       };
 
-      systemd.tmpfiles.rules = ["d /var/lib/bifrost 0777 root root -"];
-
-      # Provider API keys reach bifrost via its dashboard / data dir on first
-      # run — never inline here.
+      # Provider API keys reach bifrost via credentials.env (env.* refs in
+      # the rendered config) — never inline here.
     })
 
     (mkIf cfg.injector.enable {
