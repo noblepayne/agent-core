@@ -174,9 +174,8 @@ in {
         mcp-nixos = mcp-nixos.packages."${pkgs.stdenv.hostPlatform.system}".default;
         clojure-mcp = clojure-mcp.packages."${pkgs.stdenv.hostPlatform.system}".default;
         opencode = opencode.packages."${pkgs.stdenv.hostPlatform.system}".opencode-avx;
-        opencode2 =
-          opencode.packages."${pkgs.stdenv.hostPlatform.system}".opencode2-avx
-          or opencode.packages."${pkgs.stdenv.hostPlatform.system}".opencode2;
+        # baseline build: VM guests may lack AVX passthrough
+        opencode2 = opencode.packages."${pkgs.stdenv.hostPlatform.system}".opencode2;
         workshop-client =
           workshop.packages."${pkgs.stdenv.hostPlatform.system}".workshop-client
           or workshop.packages."${pkgs.stdenv.hostPlatform.system}".default;
