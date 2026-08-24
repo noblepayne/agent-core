@@ -160,6 +160,10 @@ in {
     mcp-nixos = mkOption {type = types.package;};
     clojure-mcp = mkOption {type = types.package;};
     opencode = mkOption {type = types.package;};
+    opencode2 = mkOption {
+      type = types.package;
+      description = "opencode2 beta line (linux-x64 only upstream).";
+    };
     workshop-client = mkOption {type = types.package;};
   };
 
@@ -170,6 +174,9 @@ in {
         mcp-nixos = mcp-nixos.packages."${pkgs.stdenv.hostPlatform.system}".default;
         clojure-mcp = clojure-mcp.packages."${pkgs.stdenv.hostPlatform.system}".default;
         opencode = opencode.packages."${pkgs.stdenv.hostPlatform.system}".opencode-avx;
+        opencode2 =
+          opencode.packages."${pkgs.stdenv.hostPlatform.system}".opencode2-avx
+          or opencode.packages."${pkgs.stdenv.hostPlatform.system}".opencode2;
         workshop-client =
           workshop.packages."${pkgs.stdenv.hostPlatform.system}".workshop-client
           or workshop.packages."${pkgs.stdenv.hostPlatform.system}".default;
