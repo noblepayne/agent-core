@@ -36,7 +36,11 @@
     config_store = {
       enabled = true;
       type = "sqlite";
-      config.path = "./config.db";
+      # Absolute path, pinned to the durable volume. Relative paths resolve
+      # against the container WORKDIR (/app), NOT -app-dir — "./config.db"
+      # put the whole config store on ephemeral container FS and every
+      # dashboard edit died on container recreate.
+      config.path = "/app/data/config.db";
     };
   };
   inherit (lib) mkEnableOption mkIf mkOption types;
@@ -87,9 +91,12 @@ in {
         });
         default = {};
         description = ''
-          Upstream providers seeded into /var/lib/bifrost/config.json at
-          activation (DB-backed bootstrap mode: Nix seeds, dashboard stays
-          usable, hash reconciliation avoids stomping manual edits).
+          Upstream providers seeded into the container's config.json at
+          activation and bootstrapped into bifrost's sqlite config store.
+          Dashboard edits persist in the DB afterward; the seed is the
+          bootstrap source, not a continuously-enforced contract. Key values
+          support "env.VARNAME" indirection against credentialsFile so
+          secrets never enter the nix store.
         '';
       };
 
