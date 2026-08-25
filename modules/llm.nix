@@ -7,6 +7,7 @@
   workshop,
   mcp-nixos,
   clojure-mcp,
+  opencode-mcp,
   opencode,
   ...
 }: {
@@ -160,12 +161,25 @@ in {
           default = null;
         };
       };
+
+      opencode = {
+        enable = mkEnableOption "OpenCode v2 MCP bridge";
+        url = mkOption {
+          type = types.str;
+          default = "";
+        };
+        passwordFile = mkOption {
+          type = types.nullOr types.path;
+          default = null;
+        };
+      };
     };
   };
 
   options.agent-core.pkgs = {
     mcp-nixos = mkOption {type = types.package;};
     clojure-mcp = mkOption {type = types.package;};
+    opencode-mcp = mkOption {type = types.package;};
     opencode = mkOption {type = types.package;};
     opencode2 = mkOption {
       type = types.package;
@@ -180,6 +194,7 @@ in {
       agent-core.pkgs = {
         mcp-nixos = mcp-nixos.packages."${pkgs.stdenv.hostPlatform.system}".default;
         clojure-mcp = clojure-mcp.packages."${pkgs.stdenv.hostPlatform.system}".default;
+        opencode-mcp = opencode-mcp.packages."${pkgs.stdenv.hostPlatform.system}".default;
         opencode = opencode.packages."${pkgs.stdenv.hostPlatform.system}".opencode-avx;
         # baseline build: VM guests may lack AVX passthrough
         opencode2 = opencode.packages."${pkgs.stdenv.hostPlatform.system}".opencode2;
@@ -318,6 +333,19 @@ in {
                 env = "HA_TOKEN";
                 prefix = "Bearer ";
               };
+              trust = "restore";
+            };
+          })
+          // (lib.optionalAttrs (cfg.injector.opencode.enable && cfg.injector.opencode.url != "") {
+            opencode = {
+              cmd = lib.getExe cfg.pkgs.opencode-mcp;
+              env =
+                {
+                  OPENCODE_URL = cfg.injector.opencode.url;
+                }
+                // (lib.optionalAttrs (cfg.injector.opencode.passwordFile != null) {
+                  OPENCODE_PASSWORD_FILE = toString cfg.injector.opencode.passwordFile;
+                });
               trust = "restore";
             };
           })

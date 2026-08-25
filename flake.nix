@@ -27,6 +27,10 @@
       url = "github:noblepayne/clojure-mcp/feat/flake";
     };
 
+    opencode-mcp = {
+      url = "github:noblepayne/opencode-mcp";
+    };
+
     opencode = {
       url = "github:noblepayne/opencode-flake";
     };
@@ -41,6 +45,7 @@
     workshop,
     mcp-nixos,
     clojure-mcp,
+    opencode-mcp,
     opencode,
   }: let
     forSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux"];
@@ -58,6 +63,7 @@
         workshop
         mcp-nixos
         clojure-mcp
+        opencode-mcp
         opencode
         ;
     };
