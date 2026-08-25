@@ -112,11 +112,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1787639186,
-        "narHash": "sha256-FVApVG7m7KRtT/1O80JppDXx1L066H17luW0xgpOpL4=",
+        "lastModified": 1787640731,
+        "narHash": "sha256-wnkcm5sXFbQSlEGOcPcNrDcPpx785W9qr0jjWeCEnLs=",
         "owner": "noblepayne",
         "repo": "datom",
-        "rev": "dc422fd44cae6bac8e0b0c80b9b7606b24a63de4",
+        "rev": "0fb49800d5a3570f820fe630fd9bbe2edf195b74",
         "type": "github"
       },
       "original": {
