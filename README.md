@@ -44,8 +44,10 @@ together and why the defaults look weird.
 ```nix
 hermes = {
   profiles.researcher.settings.model.default = "coder";
-  # each profile = own HERMES_HOME, sessions, memory, gateway unit:
-  #   /var/lib/hermes/profiles/researcher/{.hermes,workspace}
+  # each profile = own HERMES_HOME (upstream discovery path), sessions,
+  # memory, gateway unit:
+  #   /var/lib/hermes/.hermes/profiles/researcher/{config.yaml,...}
+  #   /var/lib/hermes/.hermes/profiles/researcher/workspace
   #   hermes-researcher-gateway.service
 };
 ```

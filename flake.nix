@@ -162,7 +162,11 @@
                   hermes.profiles.researcher.enable = true;
                 }
                 ++ [
-                  ({lib, pkgs, ...}: {
+                  ({
+                    lib,
+                    pkgs,
+                    ...
+                  }: {
                     agent-core.bifrost.enable = false; # no container pulls in VM
                     virtualisation.memorySize = 4096;
                     virtualisation.cores = 2;
@@ -186,10 +190,12 @@
               machine.succeed("test -L /var/lib/hermes/.hermes/plugins/datom")
               machine.succeed("test -d /var/lib/hermes/workspace")
 
-              # named profile layout + rendered config
-              machine.succeed("test -s /var/lib/hermes/profiles/researcher/.hermes/config.yaml")
-              machine.succeed("test -d /var/lib/hermes/profiles/researcher/workspace")
-              machine.succeed("test -f /var/lib/hermes/profiles/researcher/.hermes/.managed")
+              # named profile layout + rendered config (upstream discovery
+              # path: <default_home>/profiles/<name>/ IS the profile home)
+              machine.succeed("test -s /var/lib/hermes/.hermes/profiles/researcher/config.yaml")
+              machine.succeed("test -d /var/lib/hermes/.hermes/profiles/researcher/workspace")
+              machine.succeed("test -d /var/lib/hermes/.hermes/profiles/researcher/plugins")
+              machine.succeed("test -f /var/lib/hermes/.hermes/profiles/researcher/.managed")
 
               # units exist and are wired for boot
               machine.succeed("systemctl is-enabled hermes-default-gateway")
@@ -202,7 +208,7 @@
               machine.succeed(
                   "grep -q 'provider: custom:mcp-injector' /var/lib/hermes/.hermes/config.yaml")
               machine.succeed(
-                  "grep -q 'cwd: /var/lib/hermes/profiles/researcher/workspace' /var/lib/hermes/profiles/researcher/.hermes/config.yaml")
+                  "grep -q 'cwd: /var/lib/hermes/.hermes/profiles/researcher/workspace' /var/lib/hermes/.hermes/profiles/researcher/config.yaml")
 
               # env file is locked down
               machine.succeed(

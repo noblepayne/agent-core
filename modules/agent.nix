@@ -86,11 +86,19 @@
     };
   });
 
-  # Default profile keeps legacy single-agent paths; named profiles nest under profiles/.
+  # Upstream profile model: named profiles live under the DEFAULT profile's
+  # home in ``profiles/<name>/`` and that directory IS the profile's
+  # HERMES_HOME (config.yaml/.env/SOUL.md at its top level). Upstream
+  # discovery (`profiles_to_serve`, `hermes profile list`, the dashboard,
+  # kanban) enumerates ``<default_home>/profiles/*`` — anything else is
+  # invisible to those surfaces (spec pass-3: "one gateway per profile",
+  # this file's "Named profiles nest" predecessor put them under
+  # ``stateDir/profiles/<name>/.hermes`` instead, which upstream cannot see).
+  # The default profile home is ``<stateDir>/.hermes`` and it IS baseDir.
   profileBaseDir = name:
     if name == "default"
-    then coreCfg.stateDir
-    else "${coreCfg.stateDir}/profiles/${name}";
+    then "${coreCfg.stateDir}/.hermes"
+    else "${coreCfg.stateDir}/.hermes/profiles/${name}";
 
   settingsDefaults = name: let
     workspace =
@@ -224,8 +232,16 @@
   mkProfile = name: pcfg: let
     isDefault = name == "default";
     baseDir = profileBaseDir name;
-    hermesHome = "${baseDir}/.hermes";
-    workspace = "${baseDir}/workspace";
+    # The profile directory IS the HERMES_HOME (upstream profile model):
+    # config.yaml/.env/SOUL.md/... live at its top level.
+    hermesHome = baseDir;
+    # Default profile keeps the legacy workspace at stateDir/workspace;
+    # named profiles get workspace/ inside their home (upstream bootstraps
+    # a workspace dir in every profile home).
+    workspace =
+      if isDefault
+      then "${coreCfg.stateDir}/workspace"
+      else "${baseDir}/workspace";
 
     muxFlag = lib.optionalAttrs (isDefault && cfg.multiplex) {
       gateway.multiplex_profiles = true;
@@ -242,9 +258,8 @@
         (lib.mapAttrsToList (k: v: "${k}=${v}") pcfg.environment));
 
     wrapper = pkgs.writeShellScript "hermes-${name}-gateway-exec" ''
-      export HOME="${baseDir}"
+      export HOME="${coreCfg.stateDir}"
       export HERMES_HOME="${hermesHome}"
-      export HERMES_PROFILE="${name}"
       export HERMES_MANAGED="true"
       exec ${hermesPkg}/bin/hermes gateway run ${lib.escapeShellArgs pcfg.extraArgs} "$@"
     '';
@@ -253,7 +268,10 @@
       # ── profile: ${name} ──
       install -d -m 0750 -o ${coreCfg.workspaceUser} -g ${coreCfg.workspaceUser} ${baseDir}
       install -d -m 0700 -o ${coreCfg.workspaceUser} -g ${coreCfg.workspaceUser} ${hermesHome}
-      for d in cron logs memories plugins sessions skills state; do
+      # Upstream profile home bootstrap dirs (profiles.py _PROFILE_DIRS) plus
+      # agent-core specific ones. `home/` is the subprocess HOME used by
+      # terminal.home_mode: profile; `workspace` is created separately below.
+      for d in cron logs memories plugins sessions skills state plans skins home; do
         install -d -m 0700 -o ${coreCfg.workspaceUser} -g ${coreCfg.workspaceUser} "${hermesHome}/$d"
       done
       install -d -m 0750 -o ${coreCfg.workspaceUser} -g ${coreCfg.workspaceUser} ${workspace}
@@ -346,6 +364,13 @@
 
   generated = lib.mapAttrs mkProfile enabledProfiles;
 
+  # One gateway process per profile (default). Under multiplexing the
+  # default gateway serves every profile — named profiles must not run
+  # their own `gateway run` (upstream hard-errors when a multiplexer is
+  # live); keep their config renders + activation, drop their units.
+  gatewayUnits =
+    lib.filterAttrs (n: _: !cfg.multiplex || n == "default") generated;
+
   namedPorts =
     lib.filter (p: p != null) (lib.mapAttrsToList (_: p: p.port) enabledProfiles);
 
@@ -425,8 +450,8 @@ in {
       default = {};
       description = ''
         Named hermes agents. "default" is pre-seeded by mkAgentHost; extra
-        names become hermes-<name>-gateway units under
-        /var/lib/<user>/profiles/<name>.
+        names become hermes-<name>-gateway units with their home under
+        <stateDir>/.hermes/profiles/<name> (upstream discovery root).
       '';
     };
 
@@ -446,14 +471,25 @@ in {
 
     assertions = [
       {
+        # Upstream profile-name contract (hermes_cli/profiles.py
+        # _PROFILE_ID_RE + reserved names): lowercase start, [a-z0-9_-],
+        # max 64 chars. Names out of this shape are silently invisible to
+        # upstream resolution (`-p`, multiplex enumeration, dashboard).
+        # `default` is allowed — it is upstream's built-in root-profile alias
+        # (reserved only against creating a NEW profile with that name).
         assertion = let
           bad =
             lib.filter
-            (n: (builtins.match "[a-zA-Z0-9_-]+" n) == null || lib.hasPrefix "-" n)
+            (
+              n:
+                (builtins.match "[a-z0-9][a-z0-9_-]{0,63}" n)
+                == null
+                || (builtins.elem n ["hermes" "test" "tmp" "root" "sudo"])
+            )
             (builtins.attrNames enabledProfiles);
         in
           bad == [];
-        message = "agent-core.hermes.profiles: names must match [a-zA-Z0-9_-]+ (unit fragments + path components): ${toString (builtins.attrNames enabledProfiles)}";
+        message = "agent-core.hermes.profiles: names must match [a-z0-9][a-z0-9_-]{0,63} and not be reserved (hermes/test/tmp/root/sudo) — upstream resolves these as unit/path components: ${toString (builtins.attrNames enabledProfiles)}";
       }
       {
         assertion = lib.length namedPorts == lib.length (lib.unique namedPorts);
@@ -473,7 +509,7 @@ in {
         LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.zlib pkgs.stdenv.cc.cc];
       }
       // (mkIf cfg.addToSystemPackages {
-        HERMES_HOME = mkDefault "${profileBaseDir "default"}/.hermes";
+        HERMES_HOME = mkDefault "${profileBaseDir "default"}";
       });
     programs.nix-ld = {
       enable = true;
@@ -486,7 +522,7 @@ in {
           name = "hermes-${name}-gateway";
           value = g.service;
         })
-        generated))
+        gatewayUnits))
       // (lib.foldl' (acc: u: acc // u) {}
         (lib.mapAttrsToList
           (

@@ -222,23 +222,37 @@ hermes.profiles.<name> = {
 };
 ```
 
-Profile names must match `[a-zA-Z0-9_-]+` (no leading dash) — they become systemd unit
-fragments (`hermes-<name>-gateway.service`) and path components; assert at eval time.
+Profile names must match `[a-z0-9][a-z0-9_-]{0,63}` (upstream `_PROFILE_ID_RE`,
+no reserved names `hermes`/`default`/`test`/`tmp`/`root`/`sudo`) — they become
+systemd unit fragments (`hermes-<name>-gateway.service`), path components, and
+upstream's canonical profile identifiers; assert at eval time.
 
 Layout per named profile `<p>` (default profile unchanged):
 
 ```
-/var/lib/hermes/profiles/<p>/.hermes/     # HERMES_HOME — config.yaml rendered here
-/var/lib/hermes/profiles/<p>/workspace/   # terminal.cwd / workingDirectory
+/var/lib/hermes/.hermes/profiles/<p>/    # profile dir IS the HERMES_HOME —
+                                         #   config.yaml/.env/SOUL.md at top
+/var/lib/hermes/.hermes/profiles/<p>/workspace/   # terminal.cwd / workingDirectory
 ```
+
+This matches upstream's discovery contract: `hermes profile list`, the
+dashboard/Desktop profile switcher, kanban, multiplex enumeration
+(`profiles_to_serve`) and `/p/<name>/` routing all scan
+`<default_home>/profiles/*` and treat each child as a HERMES_HOME. The old
+`<stateDir>/profiles/<p>/.hermes` nesting was invisible to those surfaces
+(showfactory first-deploy lesson: the dashboard could not see the named
+profile until a hand-made symlink bridged the layouts).
 
 ### What core renders per profile
 
 1. A systemd gateway unit `hermes-<name>-gateway.service` from the SAME generator as the
    default profile (identical hardening, watchdog, drain-timeout defaults), running as
    `workspaceUser`.
-2. An exec wrapper exporting `HOME=<stateDir>/profiles/<p>`,
-   `HERMES_HOME=.../.hermes`, `HERMES_PROFILE=<name>`, `HERMES_MANAGED=true`.
+2. An exec wrapper exporting `HOME=<stateDir>` (matches the upstream NixOS
+   module — subprocess tools keep the real user home across profiles),
+   `HERMES_HOME=<default_home>/profiles/<p>` (the profile dir itself),
+   `HERMES_MANAGED=true`. Note: `HERMES_PROFILE` is NOT exported — upstream
+   does not read that variable; profile identity rides `HERMES_HOME` alone.
 3. `config.yaml` from Nix settings (core defaults deep-merged with the profile's
    `settings`) at activation — the one-rebuild property holds **per profile**.
 4. Directory scaffolding via tmpfiles/activation (0700, owned by `workspaceUser`).

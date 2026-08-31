@@ -22,24 +22,24 @@ in {
     injector ? {},
     services ? {},
     extraModules ? [],
-  }: [
-    self.nixosModules.default
-    {
-      networking.hostName = hostName;
+  }:
+    [
+      self.nixosModules.default
+      {
+        networking.hostName = hostName;
 
-      agent-core = {
-        inherit adminKeys workspaceUser credsDir workspaceRepo;
+        agent-core = {
+          inherit adminKeys workspaceUser credsDir workspaceRepo;
 
-        # Named host profiles pass through; the default profile folds in
-        # convenience args (model/tts), explicit settings always win.
-        hermes.profiles =
-          builtins.removeAttrs (hermes.profiles or {}) ["default"]
-          // {
-            "default" =
-              (hermes.profiles or {}).default or {}
-              // {
-                settings =
-                  let
+          # Named host profiles pass through; the default profile folds in
+          # convenience args (model/tts), explicit settings always win.
+          hermes.profiles =
+            builtins.removeAttrs (hermes.profiles or {}) ["default"]
+            // {
+              "default" =
+                (hermes.profiles or {}).default or {}
+                // {
+                  settings = let
                     convenienceSettings =
                       lib.optionalAttrs (hermes ? model) {
                         model.default = hermes.model;
@@ -49,19 +49,20 @@ in {
                       ((hermes.profiles or {}).default or {}).settings or {};
                   in
                     lib.recursiveUpdate convenienceSettings userDefaultSettings;
-              };
-          };
+                };
+            };
 
-        injector.chains = injector.chains or {};
-        injector.servers = injector.servers or {};
-        injector.governance = injector.governance or {};
-      };
+          injector.chains = injector.chains or {};
+          injector.servers = injector.servers or {};
+          injector.governance = injector.governance or {};
+        };
 
-      services.agent-core.searxng = services.searxng or {};
+        services.agent-core.searxng = services.searxng or {};
 
-      agent-core.hermes.timers = hermes.timers or {};
-    }
-  ] ++ extraModules;
+        agent-core.hermes.timers = hermes.timers or {};
+      }
+    ]
+    ++ extraModules;
 
   mkAgentHost = args @ {
     hostName,
