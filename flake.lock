@@ -499,11 +499,11 @@
         "nixpkgs": "nixpkgs_5"
       },
       "locked": {
-        "lastModified": 1786591961,
-        "narHash": "sha256-Ypv2+QRJH49BiLEj1/r6DWW6IjPinRyotdwnvVRkR30=",
+        "lastModified": 1788317632,
+        "narHash": "sha256-NpM+QNSYnJlUKmCiGBbvPxltjhQ6ShhqDp3CWRzMwBw=",
         "owner": "noblepayne",
         "repo": "mcp-injector",
-        "rev": "a0f201c901e1d640e9af51e22667f623801453d9",
+        "rev": "5e536ed7461c2ae3ed3de2bc791376fa61e098bb",
         "type": "github"
       },
       "original": {
